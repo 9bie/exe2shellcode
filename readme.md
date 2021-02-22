@@ -14,7 +14,7 @@ Remote Download and Memory Execute for shellcode framework
 
 windows api hashing部分直接搬过来的
 
-## (ReflectiveDLLInjection)[https://github.com/stephenfewer/ReflectiveDLLInjection]
+## [ReflectiveDLLInjection](https://github.com/stephenfewer/ReflectiveDLLInjection)
 
 准备抄袭
 
@@ -36,7 +36,7 @@ windows api hashing部分直接搬过来的
 
 使用目录下的`Get-FunctionsHash.ps1`脚本添加API HASH到hash.h
 
-![计算HASH](img/hash.png)
+![计算HASH](Image/hash.png)
 
 之后在`API.H`中添加相关WINAPI 函数指针，作为搜索地址后调用的方式，之后在`API.H->FUNCTIONS`结构体中添加相关成员
 
