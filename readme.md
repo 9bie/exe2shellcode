@@ -2,7 +2,7 @@
 
 Remote Download and Memory Execute for shellcode framework
 
-远程下载并内存加载的ShellCode框架，暂不支持X64
+远程下载并内存加载的ShellCode框架，已经支持x64
 
 # 参（抄）考（袭）项目
 
@@ -62,10 +62,6 @@ pfn->fnMessageBoxA = (pfnMessageBoxA)GetProcAddressWithHash(HASH_MessageBoxA);
 ## 使用XOR加密字符串
 
 隐藏loadlibrary特征和url特征，更不容易被发现
-
-## X64支持
-
-自行调试`Tool.h->RunPortableExecutable`函数，大概就是加个X64宏把EAX什么换成RAX(应该
 
 ## 反射DLL加载技术
 

@@ -159,6 +159,11 @@
       <AdditionalDependencies>user32.lib;winhttp.lib;msvcrt.lib;</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <PreprocessorDefinitions>_DEBUG</PreprocessorDefinitions>
+    </ClCompile>
+  </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="api.h" />
     <ClInclude Include="hash.h" />

