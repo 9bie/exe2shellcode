@@ -31,7 +31,50 @@ typedef struct _MY_LDR_DATA_TABLE_ENTRY
 //定义函数指针
 
 // Kernel32 
+typedef void (WINAPI* pfnReleaseActCtx)(
+	HANDLE hActCtx
+);
+typedef BOOL (WINAPI* pfnDeactivateActCtx)(
+	DWORD     dwFlags,
+	ULONG_PTR ulCookie
+);
+typedef BOOL (WINAPI* pfnActivateActCtx)(
+	HANDLE    hActCtx,
+	ULONG_PTR* lpCookie
+);
+typedef FARPROC (WINAPI* pfnGetProcAddress)(
+	HMODULE hModule,
+	LPCSTR  lpProcName
+);
+typedef BOOL (WINAPI* pfnVirtualProtect)(
+	LPVOID lpAddress,
+	SIZE_T dwSize,
+	DWORD  flNewProtect,
+	PDWORD lpflOldProtect
+);
+typedef HMODULE (WINAPI* pfnGetModuleHandleA)(
+	LPCSTR lpModuleName
+);
+typedef HANDLE (WINAPI* pfnCreateActCtxA)(
+	PCACTCTXA pActCtx
+);
+typedef LPVOID (WINAPI* pfnLockResource)(
+	HGLOBAL hResData
+);
+typedef DWORD (WINAPI* pfnSizeofResource)(
+	HMODULE hModule,
+	HRSRC   hResInfo
+);
+typedef HRSRC(WINAPI* pfnFindResourceA)(
+	HMODULE hModule,
+	LPCSTR  lpName,
+	LPCSTR  lpType
+);
 
+typedef HGLOBAL(WINAPI* pfnLoadResource)(
+	HMODULE hModule,
+	HRSRC   hResInfo
+);
 typedef LPVOID (WINAPI* pfnVirtualAlloc)(
 	LPVOID lpAddress,
 	SIZE_T dwSize,
@@ -192,6 +235,17 @@ typedef BOOL (WINAPI* pfnWinHttpCloseHandle)(
 //函数指针结构体
 typedef struct _FUNCTIONS
 {
+	pfnReleaseActCtx fnReleaseActCtx;
+	pfnDeactivateActCtx fnDeactivateActCtx;
+	pfnActivateActCtx fnActivateActCtx;
+	pfnGetProcAddress fnGetProcAddress;
+	pfnVirtualProtect fnVirtualProtect;
+	pfnGetModuleHandleA fnGetModuleHandleA;
+	pfnCreateActCtxA fnCreateActCtxA;
+	pfnLockResource fnLockResource;
+	pfnSizeofResource fnSizeofResource;
+	pfnFindResourceA fnFindResourceA;
+	pfnLoadResource fnLoadResource;
 	pfnVirtualAlloc fnVirtualAlloc;
 	pfnGetModuleFileNameA fnGetModuleFileNameA;
 	pfnCreateProcessA fnCreateProcessA;

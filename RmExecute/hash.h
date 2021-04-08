@@ -1,3 +1,15 @@
+#define HASH_ReleaseActCtx 0x7A558F15
+#define HASH_DeactivateActCtx 0x64151416
+#define HASH_ActivateActCtx 0xC3D0940A
+#define HASH_GetProcAddress 0x7802F749
+#define HASH_VirtualProtect 0xC38AE110
+#define HASH_GetModuleHandleA 0xDAD5B06C
+#define HASH_CreateActCtxA 0x4595146D
+#define HASH_LockResource 0x0E8BE94B
+#define HASH_SizeofResource 0x42F9102E
+#define HASH_FindResourceA 0x6558F55E
+#define HASH_LoadResource 0x8E8BB14A
+
 #define HASH_VirtualAlloc 0xE553A458
 #define HASH_GetModuleFileNameA 0xFE61445D
 #define HASH_LoadLibraryA 0x0726774C
