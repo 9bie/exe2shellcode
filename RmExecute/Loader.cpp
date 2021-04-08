@@ -113,6 +113,8 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
 */
 int _tmain(int argc, _TCHAR* argv[])
 {
+	RunShellCode();
+	return 0;
 #else
 
 int _tmain(int argc, _TCHAR* argv[])
