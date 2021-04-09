@@ -347,7 +347,7 @@ VOID RmExecute::FixImageIAT(PIMAGE_DOS_HEADER dos_header, PIMAGE_NT_HEADERS nt_h
 	LPVOID iat = (LPVOID)(iat_rva + (UINT_PTR)dos_header);
 	DWORD op;
 	fn.fnVirtualProtect(iat, iat_size, PAGE_READWRITE, &op);
-	__try {
+	
 		while (import_table->Name) {
 			import_base = fn.fnLoadLibraryA((LPCSTR)(import_table->Name + (UINT_PTR)dos_header));
 			fixup = (PIMAGE_THUNK_DATA)(import_table->FirstThunk + (UINT_PTR)dos_header);
@@ -375,10 +375,8 @@ VOID RmExecute::FixImageIAT(PIMAGE_DOS_HEADER dos_header, PIMAGE_NT_HEADERS nt_h
 			}
 			import_table++;
 		}
-	}
-	__except (1) {
-
-	}
+	
+	
 	return;
 }
 

